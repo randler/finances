@@ -251,13 +251,13 @@
 				new Chart(document.getElementById("chartjs-dashboard-line"), {
 					type: "line",
 					data: {
-						labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+						labels: <%- graphMonths %>,
 						datasets: [{
-							label: "Sales ($)",
+							label: "Salarios (R$)",
 							fill: true,
 							backgroundColor: gradient,
 							borderColor: window.theme.primary,
-							data: [<%= lastYeardataGraph %>]
+							data: [<%= graphValues %>]
 						}]
 					},
 					options: {

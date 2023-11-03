@@ -4,6 +4,7 @@ var fs = require('fs');
 
 const options = { style: 'currency', currency: 'BRL' };
 const numberFormat = new Intl.NumberFormat('pt-BR', options);
+const dateFormat = new Intl.DateTimeFormat("pt-BR",  { month: 'short'});
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -18,19 +19,23 @@ router.get('/', function(req, res, next) {
 
   let countNotes = 0;
   let totalAmount = 0;
-  let dataGraph = [];
+  let graph = {
+    values: [],
+    months: []
+  };
   CompNfse.forEach( finance => {
     countNotes ++;
     totalAmount += parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse);
-    dataGraph.push(parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse));
+    graph.values.push(parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse));
+    graph.months.push("" + dateFormat.format(new Date(finance.Nfse.InfNfse.DataEmissao)));
   });
-
 
   res.render('dashboard/index', { 
     finances: CompNfse,
     countNotes,
-    dataGraph,
-    lastYeardataGraph: dataGraph.slice(-12),
+    graph,
+    graphValues: graph.values.slice(-12),
+    graphMonths: JSON.stringify(graph.months.slice(-12)),
     totalAmount: numberFormat.format(totalAmount)
   });
 });
