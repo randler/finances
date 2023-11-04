@@ -2,11 +2,11 @@ const { default: axios } = require('axios');
 var fs = require('fs');
 const options = { style: 'currency', currency: 'BRL' };
 const numberFormat = new Intl.NumberFormat('pt-BR', options);
+const dateFormat = new Intl.DateTimeFormat("pt-BR",  { month: 'short'});
 
 const getFinances = (async (req, res) => {
 
     const finances = getJsonFinanceData();
-    //console.log('aqui', finances);
     if(finances == null) {
       res.render('dashboard/index', { finances: [] });
       return;
@@ -16,31 +16,54 @@ const getFinances = (async (req, res) => {
   
     let countNotes = 0;
     let totalAmount = 0;
-    let dataGraph = [];
+    let graph = {
+      values: [],
+      months: []
+    };
     CompNfse.forEach( finance => {
       countNotes ++;
       totalAmount += parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse);
-      dataGraph.push(parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse));
+      graph.values.push(parseFloat(finance.Nfse.InfNfse.ValoresNfse.ValorLiquidoNfse));
+      graph.months.push("" + dateFormat.format(new Date(finance.Nfse.InfNfse.DataEmissao)));
     });
 
-    //const weather = await getAPIForecastWeather();
+    const { weather, location } = await getAPIForecastWeather();
+    const dollar = await getDollarToday();
 
-    //console.log(weather);
+    const unit = weather?.daily_units?.temperature_2m_max || '' ;
+    const maxWeatherToday = weather?.daily?.temperature_2m_max[0] || '';
+    const minWeatherToday = weather?.daily?.temperature_2m_min[0] || '';
+    const maxWeatherTomorrow = weather?.daily?.temperature_2m_max[1] || '';
+    const minWeatherTomorrow = weather?.daily?.temperature_2m_min[1] || '';
 
-    res.render('dashboard/index', { 
+    return res.render('dashboard/index', { 
       finances: CompNfse,
       countNotes,
-      weather: null,
-      dataGraph,
-      lastYeardataGraph: dataGraph.slice(-12),
+      unit,
+      location,
+      maxWeatherToday,
+      minWeatherToday,
+      maxWeatherTomorrow,
+      minWeatherTomorrow,
+      graph,
+      dollar: dollar.data.USDBRL,
+      graphValues: graph.values.slice(-12),
+      graphMonths: JSON.stringify(graph.months.slice(-12)),
       totalAmount: numberFormat.format(totalAmount),
       avgAmount: numberFormat.format(totalAmount / countNotes)
     });
 })
 
+const getDollarToday = async () => {
+  
+  try {
+    return await axios.get('https://economia.awesomeapi.com.br/last/USD-BRL');
+  } catch(e) {
+    return null;
+  }
+}
 
 const getJsonFinanceData = () => {
-  
     try {
       return JSON.parse(fs.readFileSync('./static/json/finance.json', 'utf8'));
     } catch(e) {
@@ -49,32 +72,40 @@ const getJsonFinanceData = () => {
     }
   }
 
-  module.exports = {
-    getFinances
-}
-
 const getAPIForecastWeather = async () => {
     const ip = await axios.get('https://api.ipify.org?format=json');
-    const location = await axios.get(`https://api.ipbase.com/v1/json/${ip.data.ip}`);
-    const  { latitude, longitude } = location.data;
+    const location = await axios.get(`http://ip-api.com/json/${ip.data.ip}`);
+    const  { lat, lon } = location.data;
     let weather = null; 
     try {
-        const response = await axios.get(`https://forecast9.p.rapidapi.com/rapidapi/forecast/${latitude.toFixed(5)}/${longitude.toFixed(5)}/summary/`,{
-            headers: {
-                'X-RapidAPI-Key': '0799fe0e9dmshef5007898e3eeedp1a8a9fjsnbe2090b56082',
-                'X-RapidAPI-Host': 'forecast9.p.rapidapi.com'
+        const response = await axios.get(`https://api.open-meteo.com/v1/forecast`,{
+            params: {
+              "latitude": parseFloat(lat).toFixed(5),
+              "longitude": parseFloat(lon).toFixed(5),
+              "daily": ["weather_code", "temperature_2m_max", "temperature_2m_min", "apparent_temperature_max", "apparent_temperature_min", "precipitation_sum", "rain_sum", "precipitation_hours"],
+              "timezone": "America/Sao_Paulo",
+              "start_date": "2023-11-04",
+	            "end_date": "2023-11-05"
             }
         });
+
+        if(response.status != 200){
+          return null;
+        }
+
         weather = response.data;
     } catch(error) {
         console.error(error);
+        return null;
     }
 
-    
-    
     return {
-            ip: ip.data.ip,
-            location: location.data,
-            weather
-        }
+      location: location.data,
+      weather
     }
+}
+
+
+module.exports = {
+  getFinances
+}
